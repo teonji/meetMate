@@ -26,7 +26,3 @@ To use MeetPro, follow these simple steps:
 2. Use the checkbox next to each participant's name to keep track of who has spoken.
 3. If you need to leave the meeting, don't worry! Your chat history will be saved automatically.
 4. When you're ready to export your chat history, simply click the "Export" button and select your preferred format.
-
-## Feedback and Support
-
-If you have any feedback or encounter any issues while using MeetPro, please don't hesitate to contact us at [support@meetpro.com](mailto:support@meetpro.com). We're always here to help!

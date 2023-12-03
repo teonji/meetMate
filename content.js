@@ -72,6 +72,32 @@ addCss(`
     background-color: var(--hotlane-custom-background-color);
     cursor: pointer;
 }
+#timer {
+  position: absolute;
+  background-color: black;
+  z-index: 99999;
+  width: 200px;
+  height: 30px;
+  top: 10px;
+  left: 50%;
+  transform: translate(-50%, 0);
+  border-radius: 10px;
+}
+#time {
+  color: white;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  font-size: 24px;
+}
+.not-started {
+  background-color: #00ffff!important
+}
+.is-finished {
+  background-color: #ff0000!important;
+}
 `)
 
 let db
@@ -350,7 +376,7 @@ const addChatButtons = async () => {
     document.getElementById('meeting-ext-button-send-by-email').addEventListener('click', sendByEmailMessages)
     setInterval(async () => {
       await saveMessages()
-    }, 60000)
+    }, 30000)
   }
 }
 const addChatHistory = async () => {
@@ -405,6 +431,126 @@ const addCheckbox = async () => {
     })
   }
 }
+
+async function fetchGoogleApi(path, options) {
+  const { access_token } = user
+
+  return fetch(`https://www.googleapis.com/calendar/v3/${path}`, {
+    headers: {
+      Authorization: `Bearer ${access_token}`,
+      'Content-Type': 'application/json',
+    },
+    ...options,
+  });
+}
+
+async function getGoogleCalendars() {
+  const res = await fetchGoogleApi('users/me/calendarList', {
+    method: 'GET',
+  });
+
+  if (!res.ok) {
+    throw new Error(
+      `fetch calendars failed with status ${
+        res.status
+      }: ${await res.text()}`
+    );
+  }
+
+  return await res.json()
+}
+
+function getStartOfDay() {
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+  return startOfDay.toISOString();
+}
+
+function getEndOfDay() {
+  const now = new Date();
+  const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  return endOfDay.toISOString();
+}
+async function getGoogleEvents(calendarId) {
+  const timeMin = getStartOfDay();
+  const timeMax = getEndOfDay();
+
+  const res = await fetchGoogleApi(
+    `calendars/${calendarId}/events?timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&orderBy=startTime`,
+    { method: 'GET' }
+  );
+
+  if (!res.ok) {
+    throw new Error(
+      `fetch calendar events failed with status ${
+        res.status
+      }: ${await res.text()}`
+    );
+  }
+
+  const events = await res.json()
+  return events.items
+}
+const getUser = async () => {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(['user']).then((result) => {
+      resolve(result.user)
+    })
+  })
+}
+
+const setTimerText = (seconds) => {
+  const timer = document.getElementById('timer')
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds - (hours * 3600)) / 60)
+  const second = seconds - (hours * 3600) - (minutes * 60)
+  const formattedSecond = second < 10 ? `0${second}` : second
+  const formattedMinute = minutes < 10 ? `0${minutes}` : minutes
+  const formattedHour = hours < 10 ? `0${hours}` : hours
+  const formattedTime = `${formattedHour}:${formattedMinute}:${formattedSecond}`
+  timer.innerHTML = `<span id="time">${formattedTime}</span>`
+}
+
+let user = null
+getUser().then(async u => {
+  const timer = document.createElement("div")
+  timer.id = 'timer'
+  timer.innerHTML = '<span id="time"></span>'
+  document.body.appendChild(timer)
+  user = u
+  const calendars = await getGoogleCalendars()
+  const calendar = calendars.items.find(c => c.primary)
+  const events = await getGoogleEvents(calendar.id)
+  const currentEvent = events.find(e => window.location.href.includes(e.hangoutLink))
+  if (currentEvent) {
+    const currentEventStart = new Date(currentEvent.start.dateTime)
+    const currentEventEnd = new Date(currentEvent.end.dateTime)
+    setInterval(async () => {
+      const now = new Date()
+      const isStarted = now > currentEventStart
+      const isFinished = now > currentEventEnd
+      const seconds = parseInt((currentEventEnd - now) / 1000)
+      setTimerText(Math.abs(seconds))
+      if (isFinished) {
+        timer.classList.add('is-finished')
+      } else {
+        timer.classList.remove('is-finished')
+      }
+      if (!isStarted) {
+        timer.classList.add('not-started')
+      } else {
+        timer.classList.remove('not-started')
+      }
+    }, 1000)
+  } else {
+    const start = new Date()
+    setInterval(async () => {
+      const now = new Date()
+      const seconds = parseInt((now - start) / 1000)
+      setTimerText(seconds)
+    }, 1000)
+  }
+})
 
 const date = getDate()
 const meetId = getMeetId()

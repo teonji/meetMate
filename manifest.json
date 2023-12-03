@@ -1,9 +1,10 @@
 {
-  "version": "1.0",
+  "version": "2.0",
   "manifest_version": 3,
   "name": "MeetMate - Add-on for Google Meet",
   "description": "Speaker Checker, Chat Saver & Exporter",
-  "permissions": [],
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqqLh45CfKQhI5PrJGkaTqbXVbq3LqrULuVImcMdogiXhubWg5Uye7bLlLRW0+/nnVYAuK1l0ej/JGstDJsMd9cGvWPsqSJRPZvCdrMc9qcBKuPjbqmoClkvsLtbuoFl2mt7ReyIn6ymTHQkhtsPhTFLArLqE3Gc6QoIk/7+nSSMJfJQBIdlPhRxmg8ncYbHjSnT06QFz4Vliw8eoWwkWEpNH8OCAMO+tozi1HgdZcO7ZrYPJ83CN+lXaYALqF0ntnRlMrBLN6X8IKDSb+LExV8odrVC9W/1rHWJNq9r9c007RHpIWPEXerWDpkdDL0RtSNgG8oUo4njB1tCtgAWmDwIDAQAB",
+  "permissions": ["identity", "storage"],
   "host_permissions": [
     "https://meet.google.com/*"
   ],
@@ -11,6 +12,19 @@
     "16": "icons/16.png",
     "48": "icons/48.png",
     "128": "icons/128.png"
+  },
+  "action": {
+    "default_icon": {
+      "16": "icons/16.png",
+      "48": "icons/48.png",
+      "128": "icons/128.png"
+    },
+    "default_title": "Login",
+    "default_popup": "popup.html"
+  },
+  "oauth2": {
+    "client_id": "144302976950-0t7gfh08j9nncngqspaf07pambkk92ot.apps.googleusercontent.com",
+    "scopes": ["email", "https://www.googleapis.com/auth/calendar.readonly", "https://www.googleapis.com/auth/calendar.events.readonly"]
   },
   "background": {
     "service_worker": "background.js"
@@ -24,6 +38,6 @@
     }
   ],
   "content_security_policy": {
-    "extension_pages": "default-src 'self'; img-src 'self' https: data:; style-src 'unsafe-inline'; font-src 'self'"
+    "extension_pages": "default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self' https://www.googleapis.com"
   }
 }

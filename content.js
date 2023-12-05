@@ -534,7 +534,27 @@ const setTimerText = (seconds) => {
   time.innerHTML = formattedTime
 }
 
+const checkUser = async () => {
+  const loginBtn = document.getElementById('login')
+  const userSvg = document.getElementById('user-svg')
+  const userImg = document.getElementById('user-img')
+  if (!userSvg.style.display) {
+    const user = await getUser()
+    if (user) {
+      userSvg.style.display = 'none'
+      userImg.src = user.picture
+      loginBtn.style.cursor = 'default'
+    }
+  }
+}
+
 let user = null
+
+const start = new Date()
+let currentEvent = null
+let currentEventStart = new Date(currentEvent.start.dateTime)
+let currentEventEnd = new Date(currentEvent.end.dateTime)
+
 getUser().then(async u => {
   const timer = document.createElement('div')
   timer.id = 'timer'
@@ -545,19 +565,16 @@ getUser().then(async u => {
     '<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><defs><style>.cls-1{fill:#606161;}</style></defs><title/><g data-name="Layer 7" id="Layer_7"><path class="cls-1" d="M19.75,15.67a6,6,0,1,0-7.51,0A11,11,0,0,0,5,26v1H27V26A11,11,0,0,0,19.75,15.67ZM12,11a4,4,0,1,1,4,4A4,4,0,0,1,12,11ZM7.06,25a9,9,0,0,1,17.89,0Z"/></g></svg>' +
     '</span><img id="user-img"></img></span>'
   document.body.appendChild(timer)
+  user = u
   const loginBtn = document.getElementById('login')
   const userSvg = document.getElementById('user-svg')
   const userImg = document.getElementById('user-img')
   loginBtn.addEventListener('click', login)
-  user = u
-  let currentEvent = null
   if (user) {
     const events = await getGoogleEvents()
     if (events) {
       currentEvent = events.find(e => window.location.href.includes(e.hangoutLink))
-      userSvg.style.display = 'none'
-      userImg.src = user.picture
-      loginBtn.style.cursor = 'default'
+      await checkUser()
     } else {
       userSvg.style.display = 'block'
       userImg.style.display = 'none'
@@ -567,10 +584,12 @@ getUser().then(async u => {
     }
   }
   if (user && currentEvent) {
-    const currentEventStart = new Date(currentEvent.start.dateTime)
-    const currentEventEnd = new Date(currentEvent.end.dateTime)
+    currentEventStart = new Date(currentEvent.start.dateTime)
+    currentEventEnd = new Date(currentEvent.end.dateTime)
     setInterval(async () => {
+      await checkUser()
       const now = new Date()
+
       const isStarted = now > currentEventStart
       const isFinished = now > currentEventEnd
       const seconds = parseInt((currentEventEnd - now) / 1000)
@@ -587,9 +606,10 @@ getUser().then(async u => {
       }
     }, 1000)
   } else {
-    const start = new Date()
     setInterval(async () => {
+      await checkUser()
       const now = new Date()
+
       const seconds = parseInt((now - start) / 1000)
       setTimerText(seconds)
     }, 1000)

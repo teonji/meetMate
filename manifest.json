@@ -13,15 +13,6 @@
     "48": "icons/48.png",
     "128": "icons/128.png"
   },
-  "action": {
-    "default_icon": {
-      "16": "icons/16.png",
-      "48": "icons/48.png",
-      "128": "icons/128.png"
-    },
-    "default_title": "Login",
-    "default_popup": "popup.html"
-  },
   "oauth2": {
     "client_id": "144302976950-0t7gfh08j9nncngqspaf07pambkk92ot.apps.googleusercontent.com",
     "scopes": ["email", "https://www.googleapis.com/auth/calendar.readonly", "https://www.googleapis.com/auth/calendar.events.readonly"]

@@ -90,8 +90,26 @@ addCss(`
   align-items: center;
   justify-content: center;
   height: 30px;
-  font-size: 24px;
+  font-size: 18px;
 }
+#progress-content {
+  display: none;
+  position: absolute;
+  bottom: 4px;
+  height: 5px;
+  width: 120px;
+  background-color: #999;
+  border-radius: 10px;
+  left: 50%;
+  transform: translate(-50%, 0);
+}
+#progress {
+  width: 0;
+  height: 5px;
+  border-radius: 10px;
+  background-color: #00ff00;
+}
+
 #active {
   position: absolute;
   background-color: #00ff00;
@@ -100,7 +118,14 @@ addCss(`
   top: 10px;
   left: 10px;
   border-radius: 50%;
+  animation: blinker 1s linear infinite;
 }
+@keyframes blinker {
+  50% {
+    opacity: 0;
+  }
+}
+
 #login {
   cursor: pointer;
   position: absolute;
@@ -469,7 +494,6 @@ const addCheckbox = async () => {
 
 async function fetchGoogleApi(path, options) {
   const { access_token } = user
-
   return fetch(`https://www.googleapis.com/calendar/v3/${path}`, {
     headers: {
       Authorization: `Bearer ${access_token}`,
@@ -534,16 +558,30 @@ const setTimerText = (seconds) => {
   time.innerHTML = formattedTime
 }
 
-const checkUser = async () => {
+const checkUserFromStorage = async (fetchEvent) => {
   const loginBtn = document.getElementById('login')
   const userSvg = document.getElementById('user-svg')
   const userImg = document.getElementById('user-img')
   if (!userSvg.style.display) {
-    const user = await getUser()
+    user = await getUser()
     if (user) {
       userSvg.style.display = 'none'
       userImg.src = user.picture
       loginBtn.style.cursor = 'default'
+      if (fetchEvent) {
+        const events = await getGoogleEvents()
+        if (events) {
+          currentEvent = events.find(e => window.location.href.includes(e.hangoutLink))
+          if (currentEvent) {
+            const progressContent = document.getElementById('progress-content')
+            progressContent.style.display = 'block'
+            const time = document.getElementById('time')
+            time.style.marginTop = '-4px'
+            currentEventStart = new Date(currentEvent.start.dateTime)
+            currentEventEnd = new Date(currentEvent.end.dateTime)
+          }
+        }
+      }
     }
   }
 }
@@ -552,13 +590,14 @@ let user = null
 
 const start = new Date()
 let currentEvent = null
-let currentEventStart = new Date(currentEvent.start.dateTime)
-let currentEventEnd = new Date(currentEvent.end.dateTime)
+let currentEventStart = null
+let currentEventEnd = null
 
 getUser().then(async u => {
   const timer = document.createElement('div')
   timer.id = 'timer'
   timer.innerHTML = '' +
+    '<div id="progress-content"><div id="progress"></div></div>' +
     '<span id="active"></span>' +
     '<span id="time"></span>' +
     '<span id="login"><span id="user-svg">' +
@@ -574,7 +613,11 @@ getUser().then(async u => {
     const events = await getGoogleEvents()
     if (events) {
       currentEvent = events.find(e => window.location.href.includes(e.hangoutLink))
-      await checkUser()
+      const progressContent = document.getElementById('progress-content')
+      progressContent.style.display = 'block'
+      const time = document.getElementById('time')
+      time.style.marginTop = '-4px'
+      await checkUserFromStorage(false)
     } else {
       userSvg.style.display = 'block'
       userImg.style.display = 'none'
@@ -586,12 +629,19 @@ getUser().then(async u => {
   if (user && currentEvent) {
     currentEventStart = new Date(currentEvent.start.dateTime)
     currentEventEnd = new Date(currentEvent.end.dateTime)
-    setInterval(async () => {
-      await checkUser()
-      const now = new Date()
+  }
+  setInterval(async () => {
+    await checkUserFromStorage(true)
+    const now = new Date()
 
+    if (user && currentEvent) {
+      const progress = document.getElementById('progress')
       const isStarted = now > currentEventStart
       const isFinished = now > currentEventEnd
+      if (isStarted && !isFinished) {
+        const percent = 100 - ((currentEventEnd - now) / (currentEventEnd - currentEventStart) * 100)
+        progress.style.width = `${parseInt(percent <= 100 ? percent : 100)}%`
+      }
       const seconds = parseInt((currentEventEnd - now) / 1000)
       setTimerText(Math.abs(seconds))
       if (isFinished) {
@@ -604,16 +654,11 @@ getUser().then(async u => {
       } else {
         timer.classList.remove('not-started')
       }
-    }, 1000)
-  } else {
-    setInterval(async () => {
-      await checkUser()
-      const now = new Date()
-
+    } else {
       const seconds = parseInt((now - start) / 1000)
       setTimerText(seconds)
-    }, 1000)
-  }
+    }
+  }, 1000)
 })
 
 const date = getDate()

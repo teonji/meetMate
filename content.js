@@ -92,6 +92,30 @@ addCss(`
   height: 30px;
   font-size: 24px;
 }
+#active {
+  position: absolute;
+  background-color: #00ff00;
+  width: 10px;
+  height: 10px;
+  top: 10px;
+  left: 10px;
+  border-radius: 50%;
+}
+#login {
+  cursor: pointer;
+  position: absolute;
+  background-color: #ccc;
+  width: 20px;
+  height: 20px;
+  top: 5px;
+  right: 5px;
+  border-radius: 50%;
+}
+#user-img {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+}
 .not-started {
   background-color: #00ffff!important
 }
@@ -120,6 +144,17 @@ request.onupgradeneeded = (event) => {
   chatStore.createIndex('id', 'id', { unique: true })
 }
 
+const login = async () => {
+  try {
+    if (!user) {
+      chrome.runtime.sendMessage({
+        type: 'login',
+      })
+    }
+  } catch (e) {
+    console.error(e)
+  }
+}
 const htmlToElem = html => {
   let temp = document.createElement('template')
   html = html.trim()
@@ -444,22 +479,6 @@ async function fetchGoogleApi(path, options) {
   });
 }
 
-async function getGoogleCalendars() {
-  const res = await fetchGoogleApi('users/me/calendarList', {
-    method: 'GET',
-  });
-
-  if (!res.ok) {
-    throw new Error(
-      `fetch calendars failed with status ${
-        res.status
-      }: ${await res.text()}`
-    );
-  }
-
-  return await res.json()
-}
-
 function getStartOfDay() {
   const now = new Date();
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
@@ -471,25 +490,21 @@ function getEndOfDay() {
   const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
   return endOfDay.toISOString();
 }
-async function getGoogleEvents(calendarId) {
+async function getGoogleEvents() {
   const timeMin = getStartOfDay();
   const timeMax = getEndOfDay();
 
   const res = await fetchGoogleApi(
-    `calendars/${calendarId}/events?timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&orderBy=startTime`,
+    `calendars/primary/events?timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&orderBy=startTime`,
     { method: 'GET' }
   );
 
   if (!res.ok) {
-    throw new Error(
-      `fetch calendar events failed with status ${
-        res.status
-      }: ${await res.text()}`
-    );
+    return null
   }
 
   const events = await res.json()
-  return events.items
+  return events.items || []
 }
 const getUser = async () => {
   return new Promise((resolve) => {
@@ -499,8 +514,16 @@ const getUser = async () => {
   })
 }
 
+const setUser = async user => {
+  return new Promise((resolve) => {
+    chrome.storage.local.set({ user }).then((result) => {
+      resolve(result)
+    })
+  })
+}
+
 const setTimerText = (seconds) => {
-  const timer = document.getElementById('timer')
+  const time = document.getElementById('time')
   const hours = Math.floor(seconds / 3600)
   const minutes = Math.floor((seconds - (hours * 3600)) / 60)
   const second = seconds - (hours * 3600) - (minutes * 60)
@@ -508,21 +531,42 @@ const setTimerText = (seconds) => {
   const formattedMinute = minutes < 10 ? `0${minutes}` : minutes
   const formattedHour = hours < 10 ? `0${hours}` : hours
   const formattedTime = `${formattedHour}:${formattedMinute}:${formattedSecond}`
-  timer.innerHTML = `<span id="time">${formattedTime}</span>`
+  time.innerHTML = formattedTime
 }
 
 let user = null
 getUser().then(async u => {
-  const timer = document.createElement("div")
+  const timer = document.createElement('div')
   timer.id = 'timer'
-  timer.innerHTML = '<span id="time"></span>'
+  timer.innerHTML = '' +
+    '<span id="active"></span>' +
+    '<span id="time"></span>' +
+    '<span id="login"><span id="user-svg">' +
+    '<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><defs><style>.cls-1{fill:#606161;}</style></defs><title/><g data-name="Layer 7" id="Layer_7"><path class="cls-1" d="M19.75,15.67a6,6,0,1,0-7.51,0A11,11,0,0,0,5,26v1H27V26A11,11,0,0,0,19.75,15.67ZM12,11a4,4,0,1,1,4,4A4,4,0,0,1,12,11ZM7.06,25a9,9,0,0,1,17.89,0Z"/></g></svg>' +
+    '</span><img id="user-img"></img></span>'
   document.body.appendChild(timer)
+  const loginBtn = document.getElementById('login')
+  const userSvg = document.getElementById('user-svg')
+  const userImg = document.getElementById('user-img')
+  loginBtn.addEventListener('click', login)
   user = u
-  const calendars = await getGoogleCalendars()
-  const calendar = calendars.items.find(c => c.primary)
-  const events = await getGoogleEvents(calendar.id)
-  const currentEvent = events.find(e => window.location.href.includes(e.hangoutLink))
-  if (currentEvent) {
+  let currentEvent = null
+  if (user) {
+    const events = await getGoogleEvents()
+    if (events) {
+      currentEvent = events.find(e => window.location.href.includes(e.hangoutLink))
+      userSvg.style.display = 'none'
+      userImg.src = user.picture
+      loginBtn.style.cursor = 'default'
+    } else {
+      userSvg.style.display = 'block'
+      userImg.style.display = 'none'
+      loginBtn.style.cursor = 'pointer'
+      user = null
+      setUser(null)
+    }
+  }
+  if (user && currentEvent) {
     const currentEventStart = new Date(currentEvent.start.dateTime)
     const currentEventEnd = new Date(currentEvent.end.dateTime)
     setInterval(async () => {

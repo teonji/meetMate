@@ -137,6 +137,7 @@ addCss(`
   border-radius: 50%;
 }
 #user-img {
+  display: none;
   width: 20px;
   height: 20px;
   border-radius: 50%;
@@ -554,7 +555,6 @@ async function getGoogleEvents() {
 const getUser = async () => {
   try {
     return new Promise((resolve) => {
-      console.log('getUser')
       chrome.storage.local.get(['user']).then((result) => {
         resolve(result.user)
       })

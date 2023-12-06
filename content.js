@@ -142,10 +142,31 @@ addCss(`
   border-radius: 50%;
 }
 .not-started {
-  background-color: #00ffff!important
+  background-color: #1A6DDD!important
 }
 .is-finished {
   background-color: #ff0000!important;
+}
+#others-info {
+  position: absolute;
+  background-color: black;
+  z-index: 777;
+  width: 300px;
+  height: 40px;
+  top: 34px;
+  left: 50%;
+  transform: translate(-50%, 0);
+  border-radius: 10px;
+  display: none;
+  items-align: center;
+  justify-content: space-around;
+}
+#start-content, #next-content {
+  display: flex;
+  color: white;
+  flex-direction: column;
+  margin: auto;
+  text-align: center;
 }
 `)
 
@@ -531,11 +552,16 @@ async function getGoogleEvents() {
   return events.items || []
 }
 const getUser = async () => {
-  return new Promise((resolve) => {
-    chrome.storage.local.get(['user']).then((result) => {
-      resolve(result.user)
+  try {
+    return new Promise((resolve) => {
+      console.log('getUser')
+      chrome.storage.local.get(['user']).then((result) => {
+        resolve(result.user)
+      })
     })
-  })
+  } catch (e) {
+    resolve(null)
+  }
 }
 
 const setUser = async user => {
@@ -546,8 +572,7 @@ const setUser = async user => {
   })
 }
 
-const setTimerText = (seconds) => {
-  const time = document.getElementById('time')
+const setTimerText = (seconds, time) => {
   const hours = Math.floor(seconds / 3600)
   const minutes = Math.floor((seconds - (hours * 3600)) / 60)
   const second = seconds - (hours * 3600) - (minutes * 60)
@@ -562,16 +587,19 @@ const checkUserFromStorage = async (fetchEvent) => {
   const loginBtn = document.getElementById('login')
   const userSvg = document.getElementById('user-svg')
   const userImg = document.getElementById('user-img')
-  if (!userSvg.style.display) {
+
+  if (!userSvg.style.display || userSvg.style.display !== 'none') {
     user = await getUser()
     if (user) {
       userSvg.style.display = 'none'
+      userImg.style.display = 'block'
       userImg.src = user.picture
       loginBtn.style.cursor = 'default'
       if (fetchEvent) {
         const events = await getGoogleEvents()
         if (events) {
           currentEvent = events.find(e => window.location.href.includes(e.hangoutLink))
+          nextEvent = events.find(e => new Date(e.start.dateTime) > new Date())
           if (currentEvent) {
             const progressContent = document.getElementById('progress-content')
             progressContent.style.display = 'block'
@@ -590,6 +618,7 @@ let user = null
 
 const start = new Date()
 let currentEvent = null
+let nextEvent = null
 let currentEventStart = null
 let currentEventEnd = null
 
@@ -597,22 +626,38 @@ getUser().then(async u => {
   const timer = document.createElement('div')
   timer.id = 'timer'
   timer.innerHTML = '' +
-    '<div id="progress-content"><div id="progress"></div></div>' +
+    '<div id="progress-content">' +
+      '<div id="progress"></div>' +
+    '</div>' +
     '<span id="active"></span>' +
     '<span id="time"></span>' +
-    '<span id="login"><span id="user-svg">' +
-    '<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><defs><style>.cls-1{fill:#606161;}</style></defs><title/><g data-name="Layer 7" id="Layer_7"><path class="cls-1" d="M19.75,15.67a6,6,0,1,0-7.51,0A11,11,0,0,0,5,26v1H27V26A11,11,0,0,0,19.75,15.67ZM12,11a4,4,0,1,1,4,4A4,4,0,0,1,12,11ZM7.06,25a9,9,0,0,1,17.89,0Z"/></g></svg>' +
-    '</span><img id="user-img"></img></span>'
+    '<span id="login">' +
+      '<span id="user-svg">' +
+        '<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><defs><style>.cls-1{fill:#606161;}</style></defs><title/><g data-name="Layer 7" id="Layer_7"><path class="cls-1" d="M19.75,15.67a6,6,0,1,0-7.51,0A11,11,0,0,0,5,26v1H27V26A11,11,0,0,0,19.75,15.67ZM12,11a4,4,0,1,1,4,4A4,4,0,0,1,12,11ZM7.06,25a9,9,0,0,1,17.89,0Z"/></g></svg>' +
+      '</span>' +
+      '<img id="user-img"></img>' +
+    '</span>' +
+    '<div id="others-info">' +
+      '<div id="start-content"><span>Start from: </span><span id="start"></span></div>' +
+      '<div id="next-content"><span>Next meet in: </span><span id="next"></span></div>' +
+    '</div>'
   document.body.appendChild(timer)
   user = u
   const loginBtn = document.getElementById('login')
   const userSvg = document.getElementById('user-svg')
   const userImg = document.getElementById('user-img')
+  const othersInfo = document.getElementById('others-info')
   loginBtn.addEventListener('click', login)
+  timer.addEventListener('click', () => {
+    if (user && (currentEvent || nextEvent)) {
+      othersInfo.style.display = !othersInfo.style.display || othersInfo.style.display === 'none' ? 'flex' : 'none'
+    }
+  })
   if (user) {
     const events = await getGoogleEvents()
     if (events) {
       currentEvent = events.find(e => window.location.href.includes(e.hangoutLink))
+      nextEvent = events.find(e => new Date(e.start.dateTime) > new Date())
       const progressContent = document.getElementById('progress-content')
       progressContent.style.display = 'block'
       const time = document.getElementById('time')
@@ -633,6 +678,12 @@ getUser().then(async u => {
   setInterval(async () => {
     await checkUserFromStorage(true)
     const now = new Date()
+    const secondsStart = parseInt((now - start) / 1000)
+
+    const startContent = document.getElementById('start-content')
+    const startText = document.getElementById('start')
+    const nextContent = document.getElementById('next-content')
+    const nextText = document.getElementById('next')
 
     if (user && currentEvent) {
       const progress = document.getElementById('progress')
@@ -643,7 +694,8 @@ getUser().then(async u => {
         progress.style.width = `${parseInt(percent <= 100 ? percent : 100)}%`
       }
       const seconds = parseInt((currentEventEnd - now) / 1000)
-      setTimerText(Math.abs(seconds))
+      setTimerText(Math.abs(seconds), time)
+      setTimerText(secondsStart, startText)
       if (isFinished) {
         timer.classList.add('is-finished')
       } else {
@@ -655,8 +707,15 @@ getUser().then(async u => {
         timer.classList.remove('not-started')
       }
     } else {
-      const seconds = parseInt((now - start) / 1000)
-      setTimerText(seconds)
+      setTimerText(secondsStart, time)
+      const startContent = document.getElementById('start-content')
+      startContent.style.display = 'none'
+    }
+    if (nextEvent) {
+      const seconds = parseInt((new Date(nextEvent.start.dateTime) - now) / 1000)
+      setTimerText(seconds, nextText)
+    } else {
+      nextContent.style.display = 'none'
     }
   }, 1000)
 })

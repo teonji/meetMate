@@ -614,6 +614,10 @@ const checkUserFromStorage = async (fetchEvent) => {
   }
 }
 
+const date = getDate()
+const meetId = getMeetId()
+const checkUserId = `${date}-${meetId}`
+
 let user = null
 
 const start = new Date()
@@ -622,128 +626,126 @@ let nextEvent = null
 let currentEventStart = null
 let currentEventEnd = null
 
-getUser().then(async u => {
-  const timer = document.createElement('div')
-  timer.id = 'timer'
-  timer.innerHTML = '' +
-    '<div id="progress-content">' +
-      '<div id="progress"></div>' +
-    '</div>' +
-    '<span id="active"></span>' +
-    '<span id="time"></span>' +
-    '<span id="login">' +
-      '<span id="user-svg">' +
-        '<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><defs><style>.cls-1{fill:#606161;}</style></defs><title/><g data-name="Layer 7" id="Layer_7"><path class="cls-1" d="M19.75,15.67a6,6,0,1,0-7.51,0A11,11,0,0,0,5,26v1H27V26A11,11,0,0,0,19.75,15.67ZM12,11a4,4,0,1,1,4,4A4,4,0,0,1,12,11ZM7.06,25a9,9,0,0,1,17.89,0Z"/></g></svg>' +
+if (/https:\/\/meet.google.com\/[a-z]{3}-[a-z]{4}-[a-z]{3}/.test(window.location.href)) {
+  getUser().then(async u => {
+    const timer = document.createElement('div')
+    timer.id = 'timer'
+    timer.innerHTML = '' +
+      '<div id="progress-content">' +
+        '<div id="progress"></div>' +
+      '</div>' +
+      '<span id="active"></span>' +
+      '<span id="time"></span>' +
+      '<span id="login">' +
+        '<span id="user-svg">' +
+          '<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><defs><style>.cls-1{fill:#606161;}</style></defs><title/><g data-name="Layer 7" id="Layer_7"><path class="cls-1" d="M19.75,15.67a6,6,0,1,0-7.51,0A11,11,0,0,0,5,26v1H27V26A11,11,0,0,0,19.75,15.67ZM12,11a4,4,0,1,1,4,4A4,4,0,0,1,12,11ZM7.06,25a9,9,0,0,1,17.89,0Z"/></g></svg>' +
+        '</span>' +
+        '<img id="user-img"></img>' +
       '</span>' +
-      '<img id="user-img"></img>' +
-    '</span>' +
-    '<div id="others-info">' +
-      '<div id="start-content"><span>Start from: </span><span id="start"></span></div>' +
-      '<div id="next-content"><span>Next meet in: </span><span id="next"></span></div>' +
-    '</div>'
-  document.body.appendChild(timer)
-  user = u
-  const loginBtn = document.getElementById('login')
-  const userSvg = document.getElementById('user-svg')
-  const userImg = document.getElementById('user-img')
-  const othersInfo = document.getElementById('others-info')
-  loginBtn.addEventListener('click', login)
-  timer.addEventListener('click', () => {
-    if (user && (currentEvent || nextEvent)) {
-      othersInfo.style.display = !othersInfo.style.display || othersInfo.style.display === 'none' ? 'flex' : 'none'
+      '<div id="others-info">' +
+        '<div id="start-content"><span>Start from: </span><span id="start"></span></div>' +
+        '<div id="next-content"><span>Next meet in: </span><span id="next"></span></div>' +
+      '</div>'
+    document.body.appendChild(timer)
+    user = u
+    const loginBtn = document.getElementById('login')
+    const userSvg = document.getElementById('user-svg')
+    const userImg = document.getElementById('user-img')
+    const othersInfo = document.getElementById('others-info')
+    loginBtn.addEventListener('click', login)
+    timer.addEventListener('click', () => {
+      if (user && (currentEvent || nextEvent)) {
+        othersInfo.style.display = !othersInfo.style.display || othersInfo.style.display === 'none' ? 'flex' : 'none'
+      }
+    })
+    if (user) {
+      const events = await getGoogleEvents()
+      if (events) {
+        currentEvent = events.find(e => window.location.href.includes(e.hangoutLink))
+        nextEvent = events.find(e => new Date(e.start.dateTime) > new Date())
+        const progressContent = document.getElementById('progress-content')
+        progressContent.style.display = 'block'
+        const time = document.getElementById('time')
+        time.style.marginTop = '-4px'
+        await checkUserFromStorage(false)
+      } else {
+        userSvg.style.display = 'block'
+        userImg.style.display = 'none'
+        loginBtn.style.cursor = 'pointer'
+        user = null
+        setUser(null)
+      }
     }
-  })
-  if (user) {
-    const events = await getGoogleEvents()
-    if (events) {
-      currentEvent = events.find(e => window.location.href.includes(e.hangoutLink))
-      nextEvent = events.find(e => new Date(e.start.dateTime) > new Date())
-      const progressContent = document.getElementById('progress-content')
-      progressContent.style.display = 'block'
-      const time = document.getElementById('time')
-      time.style.marginTop = '-4px'
-      await checkUserFromStorage(false)
-    } else {
-      userSvg.style.display = 'block'
-      userImg.style.display = 'none'
-      loginBtn.style.cursor = 'pointer'
-      user = null
-      setUser(null)
-    }
-  }
-  if (user && currentEvent) {
-    currentEventStart = new Date(currentEvent.start.dateTime)
-    currentEventEnd = new Date(currentEvent.end.dateTime)
-  }
-  setInterval(async () => {
-    await checkUserFromStorage(true)
-    const now = new Date()
-    const secondsStart = parseInt((now - start) / 1000)
-
-    const startContent = document.getElementById('start-content')
-    const startText = document.getElementById('start')
-    const nextContent = document.getElementById('next-content')
-    const nextText = document.getElementById('next')
-
     if (user && currentEvent) {
-      const progress = document.getElementById('progress')
-      const isStarted = now > currentEventStart
-      const isFinished = now > currentEventEnd
-      if (isStarted && !isFinished) {
-        const percent = 100 - ((currentEventEnd - now) / (currentEventEnd - currentEventStart) * 100)
-        progress.style.width = `${parseInt(percent <= 100 ? percent : 100)}%`
-      }
-      const seconds = parseInt((currentEventEnd - now) / 1000)
-      setTimerText(Math.abs(seconds), time)
-      setTimerText(secondsStart, startText)
-      if (isFinished) {
-        timer.classList.add('is-finished')
-      } else {
-        timer.classList.remove('is-finished')
-      }
-      if (!isStarted) {
-        timer.classList.add('not-started')
-      } else {
-        timer.classList.remove('not-started')
-      }
-    } else {
-      setTimerText(secondsStart, time)
+      currentEventStart = new Date(currentEvent.start.dateTime)
+      currentEventEnd = new Date(currentEvent.end.dateTime)
+    }
+    setInterval(async () => {
+      await checkUserFromStorage(true)
+      const now = new Date()
+      const secondsStart = parseInt((now - start) / 1000)
+
       const startContent = document.getElementById('start-content')
-      startContent.style.display = 'none'
-    }
-    if (nextEvent) {
-      const seconds = parseInt((new Date(nextEvent.start.dateTime) - now) / 1000)
-      setTimerText(seconds, nextText)
-    } else {
-      nextContent.style.display = 'none'
-    }
-  }, 1000)
-})
+      const startText = document.getElementById('start')
+      const nextContent = document.getElementById('next-content')
+      const nextText = document.getElementById('next')
 
-const date = getDate()
-const meetId = getMeetId()
-const checkUserId = `${date}-${meetId}`
-
-if (meetId) {
-  parent.addEventListener('click', async event => {
-    setTimeout(async () => {
-      switch (event.target.innerText) {
-        case 'chat':
-        case 'chat_bubble':
-          await addChatHistory()
-          await addChatButtons()
-          break
-        case 'people_outline':
-        case 'people_alt':
-          await addCheckbox()
-          break
-        default:
-          break
+      if (user && currentEvent) {
+        const progress = document.getElementById('progress')
+        const isStarted = now > currentEventStart
+        const isFinished = now > currentEventEnd
+        if (isStarted && !isFinished) {
+          const percent = 100 - ((currentEventEnd - now) / (currentEventEnd - currentEventStart) * 100)
+          progress.style.width = `${parseInt(percent <= 100 ? percent : 100)}%`
+        }
+        const seconds = parseInt((currentEventEnd - now) / 1000)
+        setTimerText(Math.abs(seconds), time)
+        setTimerText(secondsStart, startText)
+        if (isFinished) {
+          timer.classList.add('is-finished')
+        } else {
+          timer.classList.remove('is-finished')
+        }
+        if (!isStarted) {
+          timer.classList.add('not-started')
+        } else {
+          timer.classList.remove('not-started')
+        }
+      } else {
+        setTimerText(secondsStart, time)
+        const startContent = document.getElementById('start-content')
+        startContent.style.display = 'none'
       }
-    }, 200)
+      if (nextEvent) {
+        const seconds = parseInt((new Date(nextEvent.start.dateTime) - now) / 1000)
+        setTimerText(seconds, nextText)
+      } else {
+        nextContent.style.display = 'none'
+      }
+    }, 1000)
   })
-}
 
-setInterval(async () => {
-  await addCheckbox()
-}, 10000)
+  if (meetId) {
+    parent.addEventListener('click', async event => {
+      setTimeout(async () => {
+        switch (event.target.innerText) {
+          case 'chat':
+          case 'chat_bubble':
+            await addChatHistory()
+            await addChatButtons()
+            break
+          case 'people_outline':
+          case 'people_alt':
+            await addCheckbox()
+            break
+          default:
+            break
+        }
+      }, 200)
+    })
+  }
+
+  setInterval(async () => {
+    await addCheckbox()
+  }, 10000)
+}
